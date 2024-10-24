@@ -37,7 +37,7 @@ pub struct GoPro {
 }
 
 #[cfg(feature = "wifi")]
-struct WifiCredentials {
+pub struct WifiCredentials {
     ssid: String,
     pass: String,
 }
