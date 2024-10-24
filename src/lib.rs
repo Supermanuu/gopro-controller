@@ -1,6 +1,4 @@
 mod command;
-#[cfg(feature = "wifi")]
-mod wifi;
 #[cfg(feature = "query")]
 mod query;
 mod services;
@@ -8,12 +6,15 @@ mod services;
 mod settings;
 #[cfg(test)]
 mod tests;
+#[cfg(feature = "wifi")]
+mod wifi;
 
 #[cfg(feature = "query")]
 pub use crate::query::{GoProQuery, QueryResponse, QueryResponseIntepretation};
 
 pub use crate::services::{
-    GoProControlAndQueryCharacteristics as GPCharac, GoProServices, Sendable, ToUUID, GoProWifiApCharacteristics as GPWifiCharac,
+    GoProControlAndQueryCharacteristics as GPCharac, GoProServices,
+    GoProWifiApCharacteristics as GPWifiCharac, Sendable, ToUUID,
 };
 
 pub use crate::command::GoProCommand;
@@ -30,10 +31,15 @@ use std::error::Error;
 #[cfg(feature = "wifi")]
 use wifi_rs::{prelude::*, WiFi};
 
-
 ///Represents a connected GoPro device
 pub struct GoPro {
     device: Peripheral,
+}
+
+#[cfg(feature = "wifi")]
+struct WifiCredentials {
+    ssid: String,
+    pass: String,
 }
 
 impl GoPro {
@@ -207,7 +213,6 @@ impl GoPro {
         Ok(query_response.interpret())
     }
 
-
     ///Gets the next notification (response from a command) from the GoPro
     ///
     /// # Returns
@@ -240,7 +245,7 @@ impl GoPro {
 
     #[cfg(feature = "wifi")]
     /// Connects to the GoPro's WiFi access point
-    pub async fn connect_to_ap(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn get_wifi_credentials(&self) -> Result<WifiCredentials, Box<dyn Error>> {
         //Get the SSID and password from the GoPro
         let characteristics = self.device.characteristics();
 
@@ -255,21 +260,22 @@ impl GoPro {
             .find(|c| c.uuid == GPWifiCharac::Password.to_uuid())
             .unwrap();
 
-        let ssid = self.device
-            .read(
-                &SSID_char,
-            )
-            .await?;
+        let ssid = self.device.read(&SSID_char).await?;
 
-        let pass = self.device
-            .read(
-                &pass_char,
-            )
-            .await?;
+        let pass = self.device.read(&pass_char).await?;
 
         //stringify and print out the SSID and Password
         let ssid = String::from_utf8(ssid)?;
         let pass = String::from_utf8(pass)?;
+
+        Ok(WifiCredentials { ssid, pass })
+    }
+
+    #[cfg(feature = "wifi")]
+    /// Connects to the GoPro's WiFi access point
+    pub async fn connect_to_ap(&self) -> Result<(), Box<dyn Error>> {
+        //Get the SSID and password from the GoPro
+        let WifiCredentials { ssid, pass } = self.get_wifi_credentials().await?;
 
         dbg!(&ssid.as_str());
         dbg!(&pass.as_str());
@@ -279,15 +285,9 @@ impl GoPro {
 
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
-        // Needed for special characers in wifi password
-        // Is a https://github.com/toksdotdev/wifi-rs/tree/master issue
-        let mut scaped_pass = "'".to_owned();
-        scaped_pass.push_str(&pass);
-        scaped_pass.push_str("'");
-
         //Connect to the GoPro's WiFi
         let mut wifi = WiFi::new(None);
-        match wifi.connect(ssid.as_str(), scaped_pass.as_str()) {
+        match wifi.connect(ssid.as_str(), pass.as_str()) {
             Ok(pass_correct) => {
                 if !pass_correct {
                     return Err("Password incorrect".into());
