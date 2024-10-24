@@ -279,9 +279,15 @@ impl GoPro {
 
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
+        // Needed for special characers in wifi password
+        // Is a https://github.com/toksdotdev/wifi-rs/tree/master issue
+        let scaped_pass = "'".to_owned();
+        scaped_pass.push_str(&pass);
+        scaped_pass.push_str("'");
+
         //Connect to the GoPro's WiFi
         let mut wifi = WiFi::new(None);
-        match wifi.connect(ssid.as_str(), pass.as_str()) {
+        match wifi.connect(ssid.as_str(), scaped_pass.as_str()) {
             Ok(pass_correct) => {
                 if !pass_correct {
                     return Err("Password incorrect".into());
