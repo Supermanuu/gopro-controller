@@ -281,7 +281,7 @@ impl GoPro {
 
         // Needed for special characers in wifi password
         // Is a https://github.com/toksdotdev/wifi-rs/tree/master issue
-        let scaped_pass = "'".to_owned();
+        let mut scaped_pass = "'".to_owned();
         scaped_pass.push_str(&pass);
         scaped_pass.push_str("'");
 
